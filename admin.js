@@ -63,6 +63,7 @@ async function renderAdmin(sub, app) {
   if (!configured) { app.innerHTML = '<div class="wrap" style="padding-top:26px"><div class="banner warn">Add your Supabase URL and anon key in <b>config.js</b> first.</div></div>'; return; }
   if (!sb.session) return renderLogin(app);
   if (!A) { app.innerHTML = '<div class="wrap" style="padding-top:26px"><p class="muted">Loading admin data…</p></div>'; if ((await loadAdmin()) === 'auth') return renderLogin(app, 'Session expired. Please sign in again.'); }
+  if (A.me && sb.session.must_change) return forcePw(app);
   if (!A.me) { app.innerHTML = `<div class="wrap" style="padding-top:26px"><div class="banner bad"><b>No access.</b> ${esc(sb.session.email || '')} is signed in but no admin profile exists for it yet. Ask your Sub CO admin (Circle Office) to create it.</div><button class="btn ghost" id="outBtn">Sign out</button></div>`; $('#outBtn').onclick = async () => { sb.logout(); A = null; try { await idb.set('adm2', null); } catch (e) { /* ignore */ } window.CPL.route(); }; return; }
   if (!wide() && curSub === 'setup') curSub = 'dashboard';
   const tabs = [['dashboard', 'Dashboard'], ['participants', 'Participants'], ['requests', 'Requests' + ((A.requests || []).filter(r => r.status === 'open').length ? ' (' + A.requests.filter(r => r.status === 'open').length + ')' : '')], ['fixtures', 'Fixtures'], ['notices', 'Notices'], ['communicate', 'Communicate'], ['reports', 'Reports'], ['branches', 'Branches']].concat(wide() ? [['setup', isSuper() ? 'Teams & admins' : 'RO admins']] : []);
@@ -98,6 +99,15 @@ function renderLogin(app, msg) {
   });
 }
 
+function forcePw(app) {
+  app.innerHTML = '<div class="wrap" style="padding-top:26px"><p class="muted">Set a new password to continue.</p></div>';
+  const m = openModal(`<h2>Set a new password</h2><p class="small">This is your first login. Choose your own password before using the admin area.</p><form id="fpf" class="form" style="grid-template-columns:1fr"><div class="field"><label>New password (min 8 characters)</label><input name="pw" type="text" minlength="8" autocomplete="new-password" required></div>
+    <div class="row"><button class="btn gold" type="submit">Save and continue</button><button class="btn ghost" type="button" id="fpo">Sign out</button></div></form>`);
+  const mb = m.parentNode, c = mb.cloneNode(true); mb.parentNode.replaceChild(c, mb);   // no click-away close
+  const mm = $('.modal', c);
+  $('#fpo', mm).onclick = () => { closeModal(); sb.logout(); A = null; window.CPL.route(); };
+  $('#fpf', mm).onsubmit = async e => { e.preventDefault(); if (!online()) return toast('Needs internet', true); const v = e.target.elements.pw.value; if (v.length < 8) return toast('Minimum 8 characters', true); if (v === DEF_PW) return toast('Choose a different password from the default', true); try { await sb.changePassword(v); closeModal(); toast('Password changed'); renderAdmin(curSub, app); } catch (err) { toast(err.message, true); } };
+}
 function changePw() {
   const m = openModal(`<h2>Change password</h2><form id="pwf" class="form" style="grid-template-columns:1fr"><div class="field"><label>New password (min 8 characters)</label><input name="pw" type="text" minlength="8" autocomplete="new-password" required></div>
     <div class="row"><button class="btn gold" type="submit">Save</button><button class="btn ghost" type="button" id="cx">Cancel</button></div></form>`);
@@ -611,6 +621,7 @@ function setup(t) {
   $$('[data-te]', t).forEach(b => b.onclick = () => teamForm(T(b.dataset.te)));
   $$('[data-td]', t).forEach(b => b.onclick = async () => { const tm = T(b.dataset.td); if (!online() || !confirm(`Delete ${tm.name}? This also deletes ALL its nominations and notices.`)) return; try { await db.del('cpl_teams', 'id=eq.' + tm.id); await loadPublic(); await reload('Deleted'); } catch (e) { toast(e.message, true); } });
 }
+const DEF_PW = 'cpl@1234';
 const genPw = () => { const c = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789', a = new Uint32Array(10); (window.crypto || { getRandomValues: x => x.forEach((_, i) => { x[i] = Math.random() * 4e9; }) }).getRandomValues(a); return Array.from(a, n => c[n % c.length]).join(''); };
 function userForm(u, role) {
   u = u || {}; role = u.role || role || 'coordinator';
@@ -620,7 +631,7 @@ function userForm(u, role) {
     <div class="field"><label>Email (their login)</label><input name="email" type="email" value="${esc(u.email)}" ${isNew ? '' : 'readonly'} required></div>
     <div class="field"><label>Name</label><input name="name" type="text" value="${esc(u.name)}"></div>
     <div class="field"><label>${circ ? 'Circle Office (decides which circle they manage)' : 'RO / office'}</label><select name="team" required><option value="">Select</option>${opts.map(x => `<option value="${esc(x.id)}" ${u.team_id === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
-    ${isNew ? `<div class="field"><label>Initial password</label><div class="row" style="flex-wrap:nowrap"><input name="pw" type="text" value="${genPw()}" minlength="8" required style="flex:1"><button class="btn ghost sm" type="button" id="gp">New</button></div><span class="hint">Shared with them after saving. They can change it from Admin &rarr; Change password.</span></div>` : ''}
+    ${isNew ? `<div class="field"><label>Initial password</label><div class="row" style="flex-wrap:nowrap"><input name="pw" type="text" value="${DEF_PW}" minlength="8" required style="flex:1"><button class="btn ghost sm" type="button" id="gp">Random</button></div><span class="hint">Default is cpl@1234. They must set a new password at first login.</span></div>` : ''}
     <div class="row"><button class="btn gold" type="submit">Save</button><button class="btn ghost" type="button" id="cx">Cancel</button></div></form>`);
   $('#cx', m).onclick = closeModal; const gp = $('#gp', m); if (gp) gp.onclick = () => { m.querySelector('[name=pw]').value = genPw(); };
   $('#uf', m).onsubmit = async e => {
@@ -631,7 +642,7 @@ function userForm(u, role) {
     try {
       if (isNew) {
         const pw = f.pw.value; if (pw.length < 8) return toast('Password needs at least 8 characters', true);
-        try { const r = await sb.signUp(email, pw); if (!r.confirmed) note = 'warn'; } catch (er) { if (er.code === 'exists') note = 'exists'; else throw er; }
+        try { const r = await sb.signUp(email, pw, true); if (!r.confirmed) note = 'warn'; } catch (er) { if (er.code === 'exists') note = 'exists'; else throw er; }
       }
       await db.upsert('cpl_admins', row, 'email');
       const pw = isNew ? f.pw.value : '';
@@ -642,7 +653,7 @@ function userForm(u, role) {
 }
 function credModal(row, pw, note) {
   const link = baseUrl() + '#/admin', who = `${roleLabel(row.role)}, ${tname(row.team_id)}`;
-  const msg = `*CPL 4.0 admin login - ${who}*\n\nLink: ${link}\nEmail: ${row.email}\n${note === 'exists' ? '(Use your existing password)' : 'Password: ' + pw}\n\n${row.role === 'circle' ? 'As Sub CO admin you can create the RO admin profile for each RO (Admin > RO admins > Add RO admin).' : 'As RO admin you can select your RO team, record trials, post notices and message branches.'}\nPlease change the password after the first login (Admin > Change password).`;
+  const msg = `*CPL 4.0 admin login - ${who}*\n\nLink: ${link}\nEmail: ${row.email}\n${note === 'exists' ? '(Use your existing password)' : 'Password: ' + pw + (pw === DEF_PW ? ' (you will be asked to change it at first login)' : '')}\n\n${row.role === 'circle' ? 'As Sub CO admin you can create the RO admin profile for each RO (Admin > RO admins > Add RO admin).' : 'As RO admin you can select your RO team, record trials, post notices and message branches.'}\nPlease change the password after the first login (Admin > Change password).`;
   const warn = note === 'exists' ? '<div class="banner info">A login with this email already existed, so its password was not changed. The admin profile is now linked.</div>' : note === 'warn' ? '<div class="banner warn"><b>Email confirmation is ON in Supabase.</b> This login cannot sign in until the email is confirmed. Turn off Authentication &rarr; Providers &rarr; Email &rarr; Confirm email, or confirm the user in the dashboard.</div>' : '';
   const m = openModal(`<h2>Profile created</h2>${warn}<p class="small">Send these details to <b>${esc(row.name || row.email)}</b>:</p><textarea id="credTx" style="min-height:170px;width:100%">${esc(msg)}</textarea>
     <div class="row" style="margin-top:12px"><a class="btn gold" id="credWa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">Send on WhatsApp</a><button class="btn ghost" id="credCp">Copy</button><button class="btn ghost" id="credX">Close</button></div>`);

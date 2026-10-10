@@ -1,4 +1,4 @@
-const VERSION = 'cpl4-v10';
+const VERSION = 'cpl4-v11';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'admin.js', 'config.js', 'manifest.json', 'fonts/hanken-grotesk-latin-wght-normal.woff2', 'fonts/big-shoulders-display-latin-700-normal.woff2', 'fonts/big-shoulders-display-latin-800-normal.woff2', 'fonts/big-shoulders-display-latin-900-normal.woff2', 'icon-192.png', 'icon-512.png', 'icon-512-maskable.png'];
 const LIBS = [
   'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',

@@ -41,7 +41,7 @@ const idb = (() => {
 const sb = {
   session: (() => { try { return JSON.parse(localStorage.getItem('cpl_session')); } catch { return null; } })(),
   save(s) { this.session = s; if (s) localStorage.setItem('cpl_session', JSON.stringify(s)); else localStorage.removeItem('cpl_session'); },
-  pack(j) { return { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + (j.expires_in || 3600) * 1000, email: (j.user && j.user.email) || (this.session && this.session.email) }; },
+  pack(j) { return { access_token: j.access_token, refresh_token: j.refresh_token, expires_at: Date.now() + (j.expires_in || 3600) * 1000, email: (j.user && j.user.email) || (this.session && this.session.email), must_change: j.user && j.user.user_metadata ? !!j.user.user_metadata.must_change : !!(this.session && this.session.must_change) }; },
   async login(email, password) {
     const r = await fetch(CFG.SUPABASE_URL + '/auth/v1/token?grant_type=password', { method: 'POST', headers: { apikey: CFG.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
     const j = await r.json();
@@ -55,17 +55,18 @@ const sb = {
     if (!r.ok) { this.save(null); throw new Error('Session expired'); }
     this.save(this.pack(j));
   },
-  async signUp(email, password) {   // creates an Auth user WITHOUT touching the current admin session
-    const r = await fetch(CFG.SUPABASE_URL + '/auth/v1/signup', { method: 'POST', headers: { apikey: CFG.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+  async signUp(email, password, mustChange) {   // creates an Auth user WITHOUT touching the current admin session
+    const r = await fetch(CFG.SUPABASE_URL + '/auth/v1/signup', { method: 'POST', headers: { apikey: CFG.SUPABASE_ANON_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(mustChange ? { email, password, data: { must_change: true } } : { email, password }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) { const m = String(j.msg || j.error_description || j.message || ''); const e = new Error(/registered|exists/i.test(m) ? 'EXISTS' : (m || 'Sign-up failed')); e.code = /registered|exists/i.test(m) ? 'exists' : 'fail'; throw e; }
     return { confirmed: !!j.access_token };
   },
   async changePassword(password) {
     if (this.session && this.session.expires_at - Date.now() < 30000) { try { await this.refresh(); } catch (e) { /* ignore */ } }
-    const r = await fetch(CFG.SUPABASE_URL + '/auth/v1/user', { method: 'PUT', headers: { apikey: CFG.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + (this.session && this.session.access_token), 'Content-Type': 'application/json' }, body: JSON.stringify({ password }) });
+    const r = await fetch(CFG.SUPABASE_URL + '/auth/v1/user', { method: 'PUT', headers: { apikey: CFG.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + (this.session && this.session.access_token), 'Content-Type': 'application/json' }, body: JSON.stringify({ password, data: { must_change: false } }) });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.msg || j.error_description || j.message || 'Could not change password');
+    if (this.session) { this.session.must_change = false; this.save(this.session); }
   },
   logout() { this.save(null); },
   async req(path, { method = 'GET', body, prefer, anon = false } = {}) {
