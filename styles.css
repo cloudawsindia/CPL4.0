@@ -586,3 +586,12 @@ footer.foot{background:var(--night);color:var(--soft2);border-top:2px solid var(
   .js .rv{opacity:1;transform:none}
 }
 .hscene{align-items:flex-start;padding-top:60px}
+
+/* live counter strip */
+.livebar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:14px;font-size:.86rem;color:var(--soft)}
+.livebar b{color:#fff;font-weight:700}
+.livebar .ld{width:9px;height:9px;border-radius:50%;background:#FF4D4D;box-shadow:0 0 0 0 rgba(255,77,77,.7);animation:cpl-live 1.4s ease-out infinite}
+.livebar .sep{opacity:.4}
+.bump{animation:cpl-bump .9s ease-out}
+@keyframes cpl-bump{0%{transform:scale(1)}25%{transform:scale(1.18);filter:brightness(1.5)}100%{transform:scale(1);filter:none}}
+@media (prefers-reduced-motion:reduce){.livebar .ld,.bump{animation:none!important}}

@@ -421,11 +421,12 @@ function pageHome() {
     <p class="lead">Cricket for men, badminton for women. ${teams.length} teams from ${esc(circleName)} play for one trophy.</p>
     <div class="row"><a class="btn gold" href="#/nominate">Nominate now</a><a class="btn light" href="#/fixtures">See the bracket</a><button class="btn light" type="button" data-share>Share</button></div>
     <div class="board">
-      <div class="cell">${digits(ready)}<span>Cricket squads complete of ${teams.length}</span></div>
-      <div class="cell">${digits(P.filter(x => x.sport === 'cricket').length, 3)}<span>Cricket nominations</span></div>
-      <div class="cell">${digits(P.filter(x => x.sport === 'badminton').length, 3)}<span>Badminton nominations</span></div>
-      <div class="cell">${digits(played)}<span>Matches played of ${fx.length}</span></div>
+      <div class="cell" data-k="ready">${digits(ready)}<span>Cricket squads complete of ${teams.length}</span></div>
+      <div class="cell" data-k="cricket">${digits(P.filter(x => x.sport === 'cricket').length, 3)}<span>Cricket nominations</span></div>
+      <div class="cell" data-k="badminton">${digits(P.filter(x => x.sport === 'badminton').length, 3)}<span>Badminton nominations</span></div>
+      <div class="cell" data-k="played">${digits(played)}<span>Matches played of ${fx.length}</span></div>
     </div>
+    <div class="livebar" aria-live="polite"><i class="ld"></i><span><b id="liveTot">${P.length}</b> nominations so far</span><span class="sep">|</span><span>Updates by itself, last at <b id="liveT">${new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</b></span></div>
   </div></div>
   ${tickerHTML()}
   <div class="wrap">
@@ -582,6 +583,34 @@ async function route(keep) {
   bindSport(app);
   window.scrollTo(0, keep ? y : 0);
 }
+/* ---------------- live counters (home page refreshes itself) ---------------- */
+let liveBusy = false;
+async function liveTick() {
+  if (liveBusy || document.hidden || !navigator.onLine || !configured) return;
+  const board = $('.board'); if (!board || !$('#liveTot')) return;
+  liveBusy = true;
+  try {
+    const oldKey = D.pub.participants.length + '|' + D.pub.fixtures.filter(f => f.winner).length;
+    await loadPublic(); if (D.fromCache) return;
+    const P = D.pub.participants, teams = teamsList();
+    const fx = D.pub.fixtures.filter(f => !D.circle || f.circle_id === D.circle);
+    const vals = { ready: teams.filter(t => squadOf(P, 'cricket', t.id).playing.length >= CFG.CRICKET_PLAYING).length, cricket: P.filter(x => x.sport === 'cricket').length, badminton: P.filter(x => x.sport === 'badminton').length, played: fx.filter(f => f.winner).length };
+    Object.keys(vals).forEach(k => {
+      const e = $('.board [data-k="' + k + '"] .dg'); if (!e || +e.dataset.n === vals[k]) return;
+      e.dataset.n = vals[k]; e.innerHTML = String(vals[k]).padStart(+e.dataset.min, '0').split('').map(c => `<i>${c}</i>`).join('');
+      e.classList.remove('bump'); void e.offsetWidth; e.classList.add('bump');
+    });
+    const tot = $('#liveTot'); if (tot) { if (+tot.textContent !== P.length) { tot.classList.remove('bump'); void tot.offsetWidth; tot.classList.add('bump'); } tot.textContent = P.length; }
+    const lt = $('#liveT'); if (lt) lt.textContent = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    if (oldKey !== P.length + '|' + fx.filter(f => f.winner).length) {
+      const tk = $('.ticker'); if (tk) tk.outerHTML = tickerHTML();
+      renderBoard();
+    }
+  } catch (e) { /* stay quiet, try again next round */ } finally { liveBusy = false; }
+}
+setInterval(liveTick, 25000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) liveTick(); });
+
 window.addEventListener('hashchange', () => route());
 window.addEventListener('online', async () => { updateNet(); await flushQueue(); await loadPublic(); if (!location.hash.startsWith('#/admin')) route(true); });
 window.addEventListener('offline', updateNet);
