@@ -1,0 +1,16 @@
+{
+  "name": "CPL 4.0 · Bengaluru Circle",
+  "short_name": "CPL 4.0",
+  "description": "Canara Premier League 4.0 nominations, team sheets, fixtures and admin reports for Bengaluru Circle",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F2F7FC",
+  "theme_color": "#04193A",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

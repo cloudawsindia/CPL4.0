@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CPL 4.0 · Bengaluru Circle</title>
+<meta name="theme-color" content="#04193A">
+<meta name="description" content="Canara Premier League 4.0 - Bengaluru Circle nominations, team sheets and fixtures">
+<script>try{var t=localStorage.getItem("cpl_theme");if(t==="emerald")document.documentElement.setAttribute("data-theme","emerald")}catch(e){}</script>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preload" href="fonts/hanken-grotesk-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/big-shoulders-display-latin-800-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#/"><img src="icon-192.png" alt=""><span><b>CPL 4.0</b><small>Bengaluru Circle</small></span></a>
+    <nav aria-label="Main">
+      <a href="#/"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg><span>Home</span></a>
+      <a href="#/teams"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14.2c2.6.2 4.5 2 4.5 5"/></svg><span>Teams</span></a>
+      <a href="#/fixtures"><svg viewBox="0 0 24 24"><path d="M3 4h5v5H3zM3 15h5v5H3zM16 9.5h5v5h-5z"/><path d="M8 6.5h3v11H8M11 12h5"/></svg><span>Fixtures</span></a>
+      <a href="#/nominate"><svg viewBox="0 0 24 24"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M12 12v6M9 15h6"/></svg><span>Nominate</span></a>
+      <a href="#/notices"><svg viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 1 1 12 0v5l2 2H4z"/><path d="M10 21h4"/></svg><span>Notices</span></a>
+      <a href="#/admin"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Admin</span></a>
+    </nav>
+    <button class="pill pend hide" id="pendPill" title="Tap to sync now"></button>
+    <span class="pill" id="netPill">Online</span>
+  </div>
+</header>
+<main id="app"></main>
+<footer class="foot">Created by Pawan Singh · 894257</footer>
+<div id="modalRoot"></div>
+<script src="config.js"></script>
+<script src="app.js" defer></script>
+<script src="admin.js" defer></script>
+</body>
+</html>
