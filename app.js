@@ -69,6 +69,11 @@ const sb = {
     if (this.session) { this.session.must_change = false; this.save(this.session); }
   },
   logout() { this.save(null); },
+  async all(path, opts) {   // Supabase returns at most 1000 rows per request: page through so nothing is ever cut off
+    let out = [], off = 0;
+    for (let i = 0; i < 50; i++) { const part = await this.req(path + '&limit=1000&offset=' + off, opts) || []; out = out.concat(part); if (part.length < 1000) break; off += 1000; }
+    return out;
+  },
   async req(path, { method = 'GET', body, prefer, anon = false } = {}) {
     if (!anon && this.session && this.session.expires_at - Date.now() < 30000) { try { await this.refresh(); } catch (e) { /* offline/expired */ } }
     const go = () => fetch(CFG.SUPABASE_URL + '/rest/v1/' + path, {
@@ -92,7 +97,7 @@ async function loadPublic() {
     const g = p => sb.req(p, { anon: true });
     const [circles, teams, participants, branches, fixtures, notices] = await Promise.all([
       g('cpl_circles?select=*&order=sort_order.asc'), g('cpl_teams?select=*&order=sort_order.asc,name.asc'),
-      g('cpl_public_participants?select=*&order=created_at.asc'), g('cpl_public_branches?select=*&order=branch_name.asc'),
+      sb.all('cpl_public_participants?select=*&order=created_at.asc,id.asc', { anon: true }), g('cpl_public_branches?select=*&order=branch_name.asc'),
       g('cpl_fixtures?select=*&order=match_no.asc'), g('cpl_notices?select=*&published=eq.true&order=pinned.desc,created_at.desc')
     ]);
     D.pub = { circles, teams, participants, branches, fixtures, notices };
@@ -364,14 +369,14 @@ function circleXV() {
 }
 /* While trials are pending an RO shows every nomination; once its squad is named it shows only the final list (per sport). */
 function finalised(list, sport, teamId) { return list.some(x => x.sport === sport && x.team_id === teamId && (x.status === 'playing' || x.status === 'reserve')); }
-function visibleNoms(list) {
-  const done = {}; list.forEach(x => { if (x.status === 'playing' || x.status === 'reserve') done[x.team_id + '|' + x.sport] = 1; });
-  return list.filter(x => !done[x.team_id + '|' + x.sport] || x.status === 'playing' || x.status === 'reserve');
+function visibleNoms(list) {   // every nomination stays visible; selected players are listed first
+  const rank = s => s === 'playing' ? 0 : s === 'reserve' ? 1 : 2;
+  return list.slice().sort((x, y) => rank(x.status) - rank(y.status) || String(x.created_at).localeCompare(String(y.created_at)));
 }
 function listNote(list, sport, teamId) {
   const ts = teamId ? [T(teamId)].filter(Boolean) : teamsList();
   const fin = ts.filter(t => finalised(list, sport, t.id)).length;
-  return fin ? `<p class="small muted" style="margin:0 0 8px">${teamId ? 'Final squad announced after trials.' : fin + ' of ' + ts.length + ' ROs have announced their final squad (shown below). The rest show all nominations until trials are over.'}</p>` : `<p class="small muted" style="margin:0 0 8px">All nominations received so far are listed. The final list appears here after trials.</p>`;
+  return `<p class="small muted" style="margin:0 0 8px">All nominations are listed below.${fin ? (teamId ? ' Selected players (Playing XI / Reserve) appear first.' : ' Selected players of each RO appear first.') : ''}</p>`;
 }
 const coName = id => { const t = T(id), c = t && D.pub.circles.find(c => c.id === t.circle_id); return c ? c.name : ''; };
 function nomTable(list) {
@@ -461,7 +466,7 @@ function pageTeam(id) {
   return `<div class="hero" style="margin-bottom:26px"><div class="wrap" style="padding-top:28px;padding-bottom:26px"><a href="#/teams" style="color:#B9C7DD;font-size:.9rem">‹ All teams</a><h1 style="font-size:clamp(2.2rem,6vw,3.4rem);margin:6px 0">${esc(t.name)}</h1><p class="lead" style="margin-bottom:14px">${t.kind === 'CO' ? 'Circle Office' : 'Regional Office'} team · ${P.filter(x => x.sport === 'cricket').length} cricket and ${P.filter(x => x.sport === 'badminton').length} badminton nominations</p><a class="btn gold" href="#/nominate/${esc(id)}">Nominate for ${esc(t.name)}</a></div></div>
   <div class="wrap">${statusBanners()}
   <div class="sec-h"><h2>Team sheet</h2>${sportToggle()}</div>
-  <div class="split"><div>${sheetCard(D.sport, id)}<h3 style="margin-top:20px">${finalised(P, D.sport, id) ? 'Final squad' : 'Nominations'}</h3>${listNote(P, D.sport, id)}${nomTable(visibleNoms(P.filter(x => x.sport === D.sport)))}<p style="margin-top:10px"><button class="btn ghost sm" data-req="${esc(id)}">Not listed or something wrong? Tell your RO admin</button></p></div>
+  <div class="split"><div>${sheetCard(D.sport, id)}<h3 style="margin-top:20px">Nominations</h3>${listNote(P, D.sport, id)}${nomTable(visibleNoms(P.filter(x => x.sport === D.sport)))}<p style="margin-top:10px"><button class="btn ghost sm" data-req="${esc(id)}">Not listed or something wrong? Tell your RO admin</button></p></div>
   <div><h3>Fixtures</h3>${mineFx.map(({ s, l }) => `<div class="card" style="margin-bottom:12px"><h4>${s === 'cricket' ? 'Cricket' : 'Badminton'}</h4>${l.length ? l.map(f => { const opp = f.a === id || f.team_a === id ? (f.b || null) : (f.a || null); const oppSrc = (f.team_a === id || f.a === id) ? f.src_b : f.src_a; return `<p class="small" style="margin-bottom:6px"><b>M${f.match_no}</b> vs ${opp ? esc(tname(opp)) : (oppSrc ? 'Winner of M' + oppSrc : 'TBD')}${f.winner ? ` · <span class="chip ${f.winner === id ? 'playing' : ''}">${f.winner === id ? 'Won' : 'Lost'}</span>` : ''}<br><span class="muted">${esc([f.match_date && fmtShort(f.match_date), f.match_time, f.venue].filter(Boolean).join(' · ') || 'Date to be announced')}</span></p>`; }).join('') : '<p class="muted small">No fixture listed.</p>'}</div>`).join('')}
   <h3>Branches nominated</h3>${bl.length ? (bcount.length ? `<div class="tw"><table class="tbl"><tbody>${bcount.map(x => `<tr><td>${esc(x.b.branch_name)}</td><td class="num">${x.c}</td></tr>`).join('')}</tbody></table></div><p class="small muted" style="margin-top:6px">${bl.length - bcount.length} of ${bl.length} branches yet to nominate.</p>` : `<p class="muted small">None of the ${bl.length} branches has nominated yet.</p>`) : '<p class="muted small">Branch list for this RO has not been added yet.</p>'}
   ${D.pub.notices.filter(n => n.team_id === id).map(noticeCard).join('')}</div></div></div>`;

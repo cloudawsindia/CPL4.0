@@ -42,7 +42,7 @@ const myParts = () => A.participants.filter(inScope);
 async function loadAdmin() {
   try {
     const [adm, p, b, n, s, rq] = await Promise.all([
-      sb.req('cpl_admins?select=*'), sb.req('cpl_participants?select=*&order=created_at.asc'),
+      sb.req('cpl_admins?select=*'), sb.all('cpl_participants?select=*&order=created_at.asc,id.asc'),
       sb.req('cpl_branches?select=*&order=sort_order.asc,branch_name.asc'), sb.req('cpl_notices?select=*&order=pinned.desc,created_at.desc'), sb.req('cpl_settings?select=*'),
       sb.req('cpl_requests?select=*&order=created_at.desc').catch(() => [])
     ]);
